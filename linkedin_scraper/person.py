@@ -8,6 +8,21 @@ import os
 from linkedin_scraper import selectors
 
 
+def get_text_excluding_children(driver, element):
+    return driver.execute_script("""
+    var parent = arguments[0];
+    var child = parent.firstChild;
+    var ret = "";
+    while(child) {
+        if (child.nodeType === Node.TEXT_NODE)
+            ret += child.textContent.replace(/\s*/g,'');
+            ret += '\n';
+        child = child.nextSibling;
+    }
+    return ret;
+    """, element)
+
+
 class Person(Scraper):
 
     __TOP_CARD = "pv-top-card"
@@ -156,15 +171,62 @@ class Person(Scraper):
             _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
                 EC.presence_of_element_located((By.ID, "experience-section"))
             )
-            exp = driver.find_element_by_id("experience-section")
+            exp = driver.find_element(By.ID, "experience-section")
         except:
             exp = None
 
         if exp is not None:
             for position in exp.find_elements_by_class_name("pv-position-entity"):
-                position_title = position.find_element_by_tag_name("h3").text.strip()
 
-                try:
+                position_group = position.find_elements_by_class_name("pv-entity__position-group-role-item");
+
+                if position_group:
+                    # more than one roles in same company
+                    company = (
+                        position.find_element_by_tag_name("h3")
+                            .find_elements_by_tag_name("span")[1]
+                            .text.strip()
+                    )
+                    for role_item in position_group:
+                        position_title = (
+                            role_item.find_element_by_tag_name("h3")
+                                .find_elements_by_tag_name("span")[1]
+                                .text.strip()
+                        )
+                        try:
+                            times = str(
+                                role_item.find_elements_by_tag_name("h4")[0]
+                                    .find_elements_by_tag_name("span")[1]
+                                    .text.strip()
+                            )
+                            from_date = " ".join(times.split(" ")[:2])
+                            to_date = " ".join(times.split(" ")[3:])
+                            duration = (
+                                role_item.find_elements_by_tag_name("h4")[1]
+                                    .find_elements_by_tag_name("span")[1]
+                                    .text.strip()
+                            )
+                            description = get_text_excluding_children(driver=driver,
+                                                                      element=role_item.find_element_by_class_name(
+                                                                          "pv-entity__description"))
+                        except Exception as e:
+                            print(str(e))
+                            company = None
+                            from_date, to_date, duration, location, description = (None, None, None, None, None)
+
+                        experience = Experience(
+                            position_title=position_title,
+                            from_date=from_date,
+                            to_date=to_date,
+                            duration=duration,
+                            description=description
+                        )
+                        experience.institution_name = company
+                        self.add_experience(experience)
+                else:
+                    position_title = position.find_element_by_tag_name("h3").text.strip()
+
+                    try:
                     company = position.find_elements_by_tag_name("p")[1].text.strip()
                     times = str(
                         position.find_elements_by_tag_name("h4")[0]
@@ -180,22 +242,26 @@ class Person(Scraper):
                     )
                     location = (
                         position.find_elements_by_tag_name("h4")[2]
-                        .find_elements_by_tag_name("span")[1]
-                        .text.strip()
-                    )
-                except:
-                    company = None
-                    from_date, to_date, duration, location = (None, None, None, None)
+                                .find_elements_by_tag_name("span")[1]
+                                .text.strip()
+                        )
+                        description = get_text_excluding_children(driver=driver,
+                                                                  element=position.find_element_by_class_name(
+                                                                      "pv-entity__description"))
+                    except:
+                        company = None
+                        from_date, to_date, duration, location, description = (None, None, None, None, None)
 
-                experience = Experience(
-                    position_title=position_title,
-                    from_date=from_date,
-                    to_date=to_date,
-                    duration=duration,
-                    location=location,
-                )
-                experience.institution_name = company
-                self.add_experience(experience)
+                    experience = Experience(
+                        position_title=position_title,
+                        from_date=from_date,
+                        to_date=to_date,
+                        duration=duration,
+                        location=location,
+                        description=description
+                    )
+                    experience.institution_name = company
+                    self.add_experience(experience)
 
         # get location
         location = driver.find_element_by_class_name(f"{self.__TOP_CARD}--list-bullet")
