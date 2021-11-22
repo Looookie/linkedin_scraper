@@ -8,23 +8,14 @@ import os
 from linkedin_scraper import selectors
 
 
-def get_text_excluding_children(driver, element):
-    return driver.execute_script("""
-    var parent = arguments[0];
-    var child = parent.firstChild;
-    var ret = "";
-    while(child) {
-        if (child.nodeType === Node.TEXT_NODE)
-            ret += child.textContent.replace(/\s*/g,'');
-            ret += '\n';
-        child = child.nextSibling;
-    }
-    return ret;
-    """, element)
+def is_element_present(element, by, value) -> bool:
+    try:
+        return len(element.find_elements(by, value)) > 0
+    except:
+        return False
 
 
 class Person(Scraper):
-
     __TOP_CARD = "pv-top-card"
     __WAIT_FOR_ELEMENT_TIMEOUT = 5
 
@@ -114,6 +105,23 @@ class Person(Scraper):
             div.find_element_by_tag_name("button").click()
         except Exception as e:
             pass
+
+    def _get_text_excluding_children(self, element):
+        return self.driver.execute_script("""
+        var ret = "";
+        var parent = arguments[0];
+        if (!parent)
+            return ret;
+        var child = parent.firstChild;
+        while(child) {
+            if (child.nodeType === Node.TEXT_NODE)
+                ret += child.textContent;
+            else if (child.nodeType === Node.ELEMENT_NODE && child.nodeName === 'BR')
+                ret += '\\n'
+            child = child.nextSibling;
+        }
+        return ret;
+        """, element)
 
     def scrape_logged_in(self, close_on_complete=True):
         driver = self.driver
