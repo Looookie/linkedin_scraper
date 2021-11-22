@@ -121,7 +121,7 @@ class Person(Scraper):
                 EC.presence_of_element_located(
                     (
                         By.XPATH,
-                        "//*[@class='lt-line-clamp__more']",
+                        "//button[contains(@class, 'inline-show-more-text__button')]",
                     )
                 )
             )
@@ -131,7 +131,7 @@ class Person(Scraper):
                 EC.presence_of_element_located(
                     (
                         By.XPATH,
-                        "//*[@class='lt-line-clamp__raw-line']",
+                        "//section[contains(@class, 'pv-about-section')]/div",
                     )
                 )
             )
