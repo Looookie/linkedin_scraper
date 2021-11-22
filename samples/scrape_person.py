@@ -14,6 +14,13 @@ print("Person Experiences: ")
 for experience in person.experiences:
     print(f"--: {experience.institution_name} - {experience.position_title}")
     print(
-        f"from {experience.from_date} to {experience.to_date} ({experience.duration})")
+        f"from {experience.from_date} to {experience.to_date} ({experience.duration}) at {experience.location}")
     print(
         f"{experience.description}")
+
+for education in person.educations:
+    print(f"--: {education.institution_name} - {education.degree}")
+    print(
+        f"from {education.from_date} to {education.to_date}")
+    print(
+        f"{education.description}")

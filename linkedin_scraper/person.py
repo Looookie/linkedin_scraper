@@ -19,21 +19,21 @@ class Person(Scraper):
     __WAIT_FOR_ELEMENT_TIMEOUT = 5
 
     def __init__(
-        self,
-        linkedin_url=None,
-        name=None,
-        about=None,
-        experiences=None,
-        educations=None,
-        interests=None,
-        accomplishments=None,
-        company=None,
-        job_title=None,
-        contacts=None,
-        driver=None,
-        get=True,
-        scrape=True,
-        close_on_complete=True,
+            self,
+            linkedin_url=None,
+            name=None,
+            about=None,
+            experiences=None,
+            educations=None,
+            interests=None,
+            accomplishments=None,
+            company=None,
+            job_title=None,
+            contacts=None,
+            driver=None,
+            get=True,
+            scrape=True,
+            close_on_complete=True,
     ):
         self.linkedin_url = linkedin_url
         self.name = name
@@ -185,79 +185,109 @@ class Person(Scraper):
         if exp is not None:
             for position in exp.find_elements_by_class_name("pv-position-entity"):
 
-                position_group = position.find_elements_by_class_name("pv-entity__position-group-role-item");
+                roles_group = position.find_elements(**selectors.MULTI_ROLES)
 
-                if position_group:
+                if roles_group:
                     # more than one roles in same company
-                    company = (
-                        position.find_element_by_tag_name("h3")
-                            .find_elements_by_tag_name("span")[1]
-                            .text.strip()
-                    )
-                    for role_item in position_group:
-                        position_title = (
-                            role_item.find_element_by_tag_name("h3")
-                                .find_elements_by_tag_name("span")[1]
-                                .text.strip()
-                        )
-                        try:
+                    if is_element_present(position, **selectors.COMPANY_WITH_MULTI_ROLES):
+                        company = position.find_element(**selectors.COMPANY_WITH_MULTI_ROLES).text.strip()
+                    else:
+                        company = None
+
+                    for role_item in roles_group:
+                        if is_element_present(role_item, **selectors.POSITION_WITH_MULTI_ROLES):
+                            position_title = (
+                                role_item.find_element(**selectors.POSITION_WITH_MULTI_ROLES).text.strip()
+                            )
+                        else:
+                            position_title = ""
+
+                        if is_element_present(role_item, **selectors.TIMES):
                             times = str(
-                                role_item.find_elements_by_tag_name("h4")[0]
-                                    .find_elements_by_tag_name("span")[1]
-                                    .text.strip()
+                                role_item.find_element(**selectors.TIMES).text.strip()
                             )
                             from_date = " ".join(times.split(" ")[:2])
                             to_date = " ".join(times.split(" ")[3:])
+                        else:
+                            from_date = ""
+                            to_date = ""
+
+                        if is_element_present(role_item, **selectors.DURATION):
                             duration = (
-                                role_item.find_elements_by_tag_name("h4")[1]
-                                    .find_elements_by_tag_name("span")[1]
-                                    .text.strip()
+                                role_item.find_element(**selectors.DURATION).text.strip()
                             )
-                            description = get_text_excluding_children(driver=driver,
-                                                                      element=role_item.find_element_by_class_name(
-                                                                          "pv-entity__description"))
-                        except Exception as e:
-                            print(str(e))
-                            company = None
-                            from_date, to_date, duration, location, description = (None, None, None, None, None)
+                        else:
+                            duration = ""
+
+                        if is_element_present(role_item, **selectors.LOCATION):
+                            location = (
+                                role_item.find_element(**selectors.LOCATION).text.strip()
+                            )
+                        else:
+                            location = ""
+
+                        if is_element_present(role_item, **selectors.DESCRIPTION):
+                            description = (
+                                self._get_text_excluding_children(
+                                    element=role_item.find_element(**selectors.DESCRIPTION)))
+                        else:
+                            description = ""
 
                         experience = Experience(
                             position_title=position_title,
                             from_date=from_date,
                             to_date=to_date,
                             duration=duration,
+                            location=location,
                             description=description
                         )
                         experience.institution_name = company
                         self.add_experience(experience)
                 else:
-                    position_title = position.find_element_by_tag_name("h3").text.strip()
-
-                    try:
-                    company = position.find_elements_by_tag_name("p")[1].text.strip()
-                    times = str(
-                        position.find_elements_by_tag_name("h4")[0]
-                        .find_elements_by_tag_name("span")[1]
-                        .text.strip()
-                    )
-                    from_date = " ".join(times.split(" ")[:2])
-                    to_date = " ".join(times.split(" ")[3:])
-                    duration = (
-                        position.find_elements_by_tag_name("h4")[1]
-                        .find_elements_by_tag_name("span")[1]
-                        .text.strip()
-                    )
-                    location = (
-                        position.find_elements_by_tag_name("h4")[2]
-                                .find_elements_by_tag_name("span")[1]
-                                .text.strip()
+                    if is_element_present(position, **selectors.POSITION_WITH_MULTI_ROLES):
+                        position_title = (
+                            position.find_element(**selectors.POSITION).text.strip()
                         )
-                        description = get_text_excluding_children(driver=driver,
-                                                                  element=position.find_element_by_class_name(
-                                                                      "pv-entity__description"))
-                    except:
-                        company = None
-                        from_date, to_date, duration, location, description = (None, None, None, None, None)
+                    else:
+                        position_title = ""
+
+                    if is_element_present(position, **selectors.COMPANY):
+                        company = (
+                            position.find_element(**selectors.COMPANY).text.strip()
+                        )
+                    else:
+                        company = ""
+
+                    if is_element_present(position, **selectors.TIMES):
+                        times = str(
+                            position.find_element(**selectors.TIMES).text.strip()
+                        )
+                        from_date = " ".join(times.split(" ")[:2])
+                        to_date = " ".join(times.split(" ")[3:])
+                    else:
+                        from_date = ""
+                        to_date = ""
+
+                    if is_element_present(position, **selectors.DURATION):
+                        duration = (
+                            position.find_element(**selectors.DURATION).text.strip()
+                        )
+                    else:
+                        duration = ""
+
+                    if is_element_present(position, **selectors.LOCATION):
+                        location = (
+                            position.find_element(**selectors.LOCATION).text.strip()
+                        )
+                    else:
+                        location = ""
+
+                    if is_element_present(position, **selectors.DESCRIPTION):
+                        description = (
+                            self._get_text_excluding_children(
+                                element=position.find_element(**selectors.DESCRIPTION)))
+                    else:
+                        description = ""
 
                     experience = Experience(
                         position_title=position_title,
@@ -291,7 +321,7 @@ class Person(Scraper):
             edu = None
         if edu:
             for school in edu.find_elements_by_class_name(
-                "pv-profile-section__list-item"
+                    "pv-profile-section__list-item"
             ):
                 university = school.find_element_by_class_name(
                     "pv-entity__school-name"
@@ -300,13 +330,13 @@ class Person(Scraper):
                 try:
                     degree = (
                         school.find_element_by_class_name("pv-entity__degree-name")
-                        .find_elements_by_tag_name("span")[1]
-                        .text.strip()
+                            .find_elements_by_tag_name("span")[1]
+                            .text.strip()
                     )
                     times = (
                         school.find_element_by_class_name("pv-entity__dates")
-                        .find_elements_by_tag_name("span")[1]
-                        .text.strip()
+                            .find_elements_by_tag_name("span")[1]
+                            .text.strip()
                     )
                     from_date, to_date = (times.split(" ")[0], times.split(" ")[2])
                 except:
@@ -333,7 +363,7 @@ class Person(Scraper):
                                                     "//*[@class='pv-profile-section pv-interests-section artdeco-container-card artdeco-card ember-view']"
                                                     )
             for interestElement in interestContainer.find_elements_by_xpath(
-                "//*[@class='pv-interest-entity pv-profile-section__card-item ember-view']"
+                    "//*[@class='pv-interest-entity pv-profile-section__card-item ember-view']"
             ):
                 interest = Interest(
                     interestElement.find_element_by_tag_name("h3").text.strip()
@@ -356,11 +386,11 @@ class Person(Scraper):
                                       "//*[@class='pv-profile-section pv-accomplishments-section artdeco-container-card artdeco-card ember-view']"
                                       )
             for block in acc.find_elements_by_xpath(
-                "//div[@class='pv-accomplishments-block__content break-words']"
+                    "//div[@class='pv-accomplishments-block__content break-words']"
             ):
                 category = block.find_element_by_tag_name("h3")
                 for title in block.find_element_by_tag_name(
-                    "ul"
+                        "ul"
                 ).find_elements_by_tag_name("li"):
                     accomplishment = Accomplishment(category.text, title.text)
                     self.add_accomplishment(accomplishment)
@@ -415,7 +445,7 @@ class Person(Scraper):
 
         if exp is not None:
             for position in exp.find_elements_by_class_name(
-                "experience-item__contents"
+                    "experience-item__contents"
             ):
                 position_title = position.find_element_by_class_name(
                     "experience-item__title"
