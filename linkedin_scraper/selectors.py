@@ -46,3 +46,13 @@ DESCRIPTION = {
     'by': By.XPATH,
     'value': ".//div[contains(@class, 'pv-entity__description')]"
 }
+
+JOB_TITLE_CURRENT = {
+    'by': By.XPATH,
+    'value': "//div[contains(@class, 'pv-text-details__left-panel')]/div[2]"
+}
+
+LOCATION_CURRENT = {
+    'by': By.XPATH,
+    'value': "//div[contains(@class, 'pv-text-details__left-panel')][2]/span[1]"
+}

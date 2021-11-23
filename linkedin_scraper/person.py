@@ -29,6 +29,7 @@ class Person(Scraper):
             accomplishments=None,
             company=None,
             job_title=None,
+            location=None,
             contacts=None,
             driver=None,
             get=True,
@@ -44,6 +45,8 @@ class Person(Scraper):
         self.accomplishments = accomplishments or []
         self.also_viewed_urls = []
         self.contacts = contacts or []
+        self.job_title = job_title
+        self.location = location
 
         if driver is None:
             try:
@@ -66,8 +69,11 @@ class Person(Scraper):
         if scrape:
             self.scrape(close_on_complete)
 
+    def add_job_title(self, job_title):
+        self.job_title = job_title
+
     def add_about(self, about):
-        self.about.append(about)
+        self.about = about
 
     def add_experience(self, experience):
         self.experiences.append(experience)
@@ -301,8 +307,10 @@ class Person(Scraper):
                     self.add_experience(experience)
 
         # get location
-        location = driver.find_element(By.CLASS_NAME, f"{self.__TOP_CARD}--list-bullet")
-        location = location.find_element_by_tag_name("li").text
+        job_title = driver.find_element(**selectors.JOB_TITLE_CURRENT).text.strip()
+        self.add_job_title(job_title)
+
+        location = driver.find_element(**selectors.LOCATION_CURRENT).text.strip()
         self.add_location(location)
 
         driver.execute_script(
@@ -548,3 +556,7 @@ class Person(Scraper):
             acc=self.accomplishments,
             conn=self.contacts,
         )
+
+    @job_title.setter
+    def job_title(self, value):
+        self._job_title = value
