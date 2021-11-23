@@ -11,6 +11,7 @@ class Contact:
     name: str = None
     occupation: str = None
     url: str = None
+    location: str = None
 
 
 @dataclass

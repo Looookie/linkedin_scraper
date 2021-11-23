@@ -2,6 +2,11 @@ from selenium.webdriver.common.by import By
 
 NAME = "text-heading-xlarge"
 
+TOP_CARD = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'pv-top-card')]"
+}
+
 MULTI_ROLES = {
     'by': By.XPATH,
     'value': ".//*[contains(@class, 'pv-entity__position-group-role-item')]/div"
@@ -55,4 +60,34 @@ JOB_TITLE_CURRENT = {
 LOCATION_CURRENT = {
     'by': By.XPATH,
     'value': "//div[contains(@class, 'pv-text-details__left-panel')][2]/span[1]"
+}
+
+CONTACT_EMAIL = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'ci-email')]/div"
+}
+
+CONTACT_IMS = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'ci-ims')]//span"
+}
+
+CONNECTION_NAME = {
+    'by': By.XPATH,
+    'value': "(.//a[1]/span/span)[1]"
+}
+
+CONNECTION_OCCUPATION = {
+    'by': By.XPATH,
+    'value': ".//div[contains(@class, 'entity-result__primary-subtitle')]"
+}
+
+CONNECTION_URL = {
+    'by': By.XPATH,
+    'value': ".//a[1]"
+}
+
+CONNECTION_LOCATION = {
+    'by': By.XPATH,
+    'value': ".//div[contains(@class, 'entity-result__secondary-subtitle')]"
 }

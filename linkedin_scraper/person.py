@@ -17,6 +17,7 @@ def is_element_present(element, by, value) -> bool:
 class Person(Scraper):
     __TOP_CARD = "pv-top-card"
     __WAIT_FOR_ELEMENT_TIMEOUT = 5
+    __WAIT_FOR_SEARCH_TIMEOUT = 5
 
     def __init__(
             self,
@@ -30,6 +31,7 @@ class Person(Scraper):
             company=None,
             job_title=None,
             location=None,
+            connections=None,
             contacts=None,
             driver=None,
             get=True,
@@ -44,9 +46,10 @@ class Person(Scraper):
         self.interests = interests or []
         self.accomplishments = accomplishments or []
         self.also_viewed_urls = []
-        self.contacts = contacts or []
+        self.connections = connections or []
         self.job_title = job_title
         self.location = location
+        self.contacts = contacts or {}
 
         if driver is None:
             try:
@@ -69,6 +72,12 @@ class Person(Scraper):
         if scrape:
             self.scrape(close_on_complete)
 
+    def add_contacts(self, contacts):
+        self.contacts = contacts
+
+    def add_connection(self, connection):
+        self.connections.append(connection)
+
     def add_job_title(self, job_title):
         self.job_title = job_title
 
@@ -89,9 +98,6 @@ class Person(Scraper):
 
     def add_location(self, location):
         self.location = location
-
-    def add_contact(self, contact):
-        self.contacts.append(contact)
 
     def scrape(self, close_on_complete=True):
         if self.is_signed_in():
@@ -173,6 +179,63 @@ class Person(Scraper):
             about = None
         if about:
             self.add_about(about.text.strip())
+
+        # get contacts
+        try:
+            open_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//div[contains(@class, 'pv-text-details__left-panel')][2]//a[1]",
+                    )
+                )
+            )
+            driver.execute_script("arguments[0].click();", open_contracts)
+
+            # -> get ims
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        selectors.CONTACT_IMS['by'],
+                        selectors.CONTACT_IMS['value']
+                    )
+                )
+            )
+            ims_spans = driver.find_elements(**selectors.CONTACT_IMS) or []
+            ims_key = []
+            ims_value = []
+            for ims_pos in range(len(ims_spans)):
+                if ims_pos % 2 == 0:
+                    ims_value.append(ims_spans[ims_pos].text.strip())
+                else:
+                    ims_key.append(ims_spans[ims_pos].text.strip().replace("(", "").replace(")", ""))
+            contacts = dict(zip(ims_key, ims_value))
+
+            # -> get email
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        selectors.CONTACT_EMAIL['by'],
+                        selectors.CONTACT_EMAIL['value']
+                    )
+                )
+            )
+            contact_email = self._try_get_text_from_element(driver, selectors.CONTACT_EMAIL)
+            if contact_email:
+                contacts["email"] = contact_email
+
+            close_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//*[@data-test-modal-close-btn]",
+                    )
+                )
+            )
+            driver.execute_script("arguments[0].click();", close_contracts)
+        except:
+            contacts = {}
+        self.add_contacts(contacts)
 
         driver.execute_script(
             "window.scrollTo(0, Math.ceil(document.body.scrollHeight/2));"
@@ -272,10 +335,11 @@ class Person(Scraper):
                     experience.institution_name = company
                     self.add_experience(experience)
 
-        # get location
+        # get job title
         job_title = driver.find_element(**selectors.JOB_TITLE_CURRENT).text.strip()
         self.add_job_title(job_title)
 
+        # get location
         location = driver.find_element(**selectors.LOCATION_CURRENT).text.strip()
         self.add_location(location)
 
@@ -333,73 +397,66 @@ class Person(Scraper):
         # get interest
         try:
 
-            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        "//*[@class='pv-profile-section pv-interests-section artdeco-container-card artdeco-card ember-view']",
-                    )
-                )
-            )
-            interestContainer = driver.find_element(By.XPATH,
-                                                    "//*[@class='pv-profile-section pv-interests-section artdeco-container-card artdeco-card ember-view']"
-                                                    )
-            for interestElement in interestContainer.find_elements_by_xpath(
-                    "//*[@class='pv-interest-entity pv-profile-section__card-item ember-view']"
-            ):
-                interest = Interest(
-                    interestElement.find_element_by_tag_name("h3").text.strip()
-                )
-                self.add_interest(interest)
-        except:
-            pass
-
-        # get accomplishment
-        try:
-            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        "//*[@class='pv-profile-section pv-accomplishments-section artdeco-container-card artdeco-card ember-view']",
-                    )
-                )
-            )
-            acc = driver.find_element(By.XPATH,
-                                      "//*[@class='pv-profile-section pv-accomplishments-section artdeco-container-card artdeco-card ember-view']"
-                                      )
-            for block in acc.find_elements_by_xpath(
-                    "//div[@class='pv-accomplishments-block__content break-words']"
-            ):
-                category = block.find_element_by_tag_name("h3")
-                for title in block.find_element_by_tag_name(
-                        "ul"
-                ).find_elements_by_tag_name("li"):
-                    accomplishment = Accomplishment(category.text, title.text)
-                    self.add_accomplishment(accomplishment)
-        except:
-            pass
-
         # get connections
-        try:
-            driver.get("https://www.linkedin.com/mynetwork/invite-connect/connections/")
-            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "mn-connections"))
+        goto_connections = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                    "//*[contains(@class, 'pv-top-card--list')]//a",
+                )
             )
-            connections = driver.find_element(By.CLASS_NAME, "mn-connections")
-            if connections is not None:
-                for conn in connections.find_elements_by_class_name("mn-connection-card"):
-                    anchor = conn.find_element_by_class_name("mn-connection-card__link")
-                    url = anchor.get_attribute("href")
-                    name = conn.find_element_by_class_name("mn-connection-card__details").find_element_by_class_name(
-                        "mn-connection-card__name").text.strip()
-                    occupation = conn.find_element_by_class_name(
-                        "mn-connection-card__details").find_element_by_class_name(
-                        "mn-connection-card__occupation").text.strip()
+        )
+        driver.execute_script("arguments[0].click();", goto_connections)
 
-                    contact = Contact(name=name, occupation=occupation, url=url)
-                    self.add_contact(contact)
-        except:
-            connections = None
+        while True:
+            search_results = WebDriverWait(driver, self.__WAIT_FOR_SEARCH_TIMEOUT).until(
+                EC.presence_of_all_elements_located(
+                    (
+                        By.XPATH,
+                        "//div[contains(@class, 'entity-result__content')]",
+                    )
+                )
+            )
+
+            for result_item in search_results:
+                connection_name = self._try_get_text_from_element(result_item, selectors.CONNECTION_NAME)
+                connection_occupation = self._try_get_text_from_element(result_item, selectors.CONNECTION_OCCUPATION)
+                url = result_item.find_element(**selectors.CONNECTION_URL).get_attribute('href')
+                connection_url = url[:url.rfind('?')]
+                connection_location = self._try_get_text_from_element(result_item, selectors.CONNECTION_LOCATION)
+                self.add_connection(Contact(name=connection_name, occupation=connection_occupation, url=connection_url,
+                                            location=connection_location))
+
+            driver.execute_script("var q=document.documentElement.scrollTop=10000")
+            driver.implicitly_wait(2)
+            goto_next = driver.find_element(By.XPATH, "//button[contains(@class, 'artdeco-pagination__button--next')]")
+            if goto_next.get_attribute('disabled') != 'true':
+                driver.execute_script("arguments[0].click();", goto_next)
+            else:
+                break
+
+        # try:
+        #     driver.get("https://www.linkedin.com/mynetwork/invite-connect/connections/")
+        #     _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+        #         EC.presence_of_element_located((By.CLASS_NAME, "mn-connections"))
+        #     )
+        #     connections = driver.find_element(By.CLASS_NAME, "mn-connections")
+        #     if connections is not None:
+        #         for conn in connections.find_elements_by_class_name("mn-connection-card"):
+        #             anchor = conn.find_element_by_class_name("mn-connection-card__link")
+        #             url = anchor.get_attribute("href")
+        #             name = conn.find_element_by_class_name("mn-connection-card__details").find_element_by_class_name(
+        #                 "mn-connection-card__name").text.strip()
+        #             occupation = conn.find_element_by_class_name(
+        #                 "mn-connection-card__details").find_element_by_class_name(
+        #                 "mn-connection-card__occupation").text.strip()
+        #
+        #             contact = Contact(name=name, occupation=occupation, url=url)
+        #             self.add_contact(contact)
+        # except:
+        #     connections = None
+
+
 
         if close_on_complete:
             driver.quit()
