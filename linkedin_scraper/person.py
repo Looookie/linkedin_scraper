@@ -498,23 +498,52 @@ class Person(Scraper):
         if close_on_complete:
             driver.close()
 
+    def to_json(self):
+        json = {}
+        json["name"] = self.name
+        json["about"] = self.about
+        json["job_title"] = self.job_title
+        json["location"] = self.location
+        json["contacts"] = self.contacts
+        json["experiences"] = []
+        json["educations"] = []
+        json["connections"] = []
+
+        for experience in self.experiences:
+            exp = {}
+            exp["company"] = experience.institution_name
+            exp["position_title"] = experience.position_title
+            exp["from_date"] = experience.from_date
+            exp["to_date"] = experience.to_date
+            exp["duration"] = experience.duration
+            exp["location"] = experience.location
+            exp["description"] = experience.description
+            json["experiences"].append(exp)
+
+        for education in self.educations:
+            edu = {}
+            edu["institution_name"] = education.institution_name
+            edu["degree"] = education.degree
+            edu["from_date"] = education.from_date
+            edu["to_date"] = education.to_date
+            json["educations"].append(edu)
+
+        for connection in self.connections:
+            con = {}
+            con["name"] = connection.name
+            con["occupation"] = connection.occupation
+            con["url"] = connection.url
+            con["location"] = connection.location
+            json["connections"].append(con)
+
+        return json
+
     @property
     def company(self):
         if self.experiences:
             return (
                 self.experiences[0].institution_name
                 if self.experiences[0].institution_name
-                else None
-            )
-        else:
-            return None
-
-    @property
-    def job_title(self):
-        if self.experiences:
-            return (
-                self.experiences[0].position_title
-                if self.experiences[0].position_title
                 else None
             )
         else:
@@ -530,7 +559,3 @@ class Person(Scraper):
             acc=self.accomplishments,
             conn=self.contacts,
         )
-
-    @job_title.setter
-    def job_title(self, value):
-        self._job_title = value
