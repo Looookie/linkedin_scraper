@@ -10,6 +10,10 @@ person = Person("https://www.linkedin.com/in/andre-iguodala-65b48ab5", driver=dr
 print("Person: " + person.name)
 print("Person About: ")
 print(person.about)
+print("Person Job Title: ")
+print(person.job_title)
+print("Person Location: ")
+print(person.location)
 print("Person Experiences: ")
 for experience in person.experiences:
     print(f"--: {experience.institution_name} - {experience.position_title}")
@@ -24,3 +28,6 @@ for education in person.educations:
         f"from {education.from_date} to {education.to_date}")
     print(
         f"{education.description}")
+
+for contact in person.contacts:
+    print(f"--: {contact.name} - {contact.occupation} - {contact.url}")

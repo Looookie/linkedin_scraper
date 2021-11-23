@@ -128,6 +128,12 @@ class Person(Scraper):
         return ret;
         """, element)
 
+    def _try_get_text_from_element(self, root, selector):
+        if is_element_present(root, **selector):
+            return root.find_element(**selector).text.strip()
+        else:
+            return ""
+
     def scrape_logged_in(self, close_on_complete=True):
         driver = self.driver
         duration = None
@@ -195,42 +201,23 @@ class Person(Scraper):
 
                 if roles_group:
                     # more than one roles in same company
-                    if is_element_present(position, **selectors.COMPANY_WITH_MULTI_ROLES):
-                        company = position.find_element(**selectors.COMPANY_WITH_MULTI_ROLES).text.strip()
-                    else:
-                        company = None
+                    company = self._try_get_text_from_element(position, selectors.COMPANY_WITH_MULTI_ROLES)
 
                     for role_item in roles_group:
-                        if is_element_present(role_item, **selectors.POSITION_WITH_MULTI_ROLES):
-                            position_title = (
-                                role_item.find_element(**selectors.POSITION_WITH_MULTI_ROLES).text.strip()
-                            )
-                        else:
-                            position_title = ""
+                        position_title = self._try_get_text_from_element(role_item, selectors.POSITION_WITH_MULTI_ROLES)
 
-                        if is_element_present(role_item, **selectors.TIMES):
-                            times = str(
-                                role_item.find_element(**selectors.TIMES).text.strip()
-                            )
+                        times = self._try_get_text_from_element(role_item, selectors.TIMES)
+
+                        if times:
                             from_date = " ".join(times.split(" ")[:2])
                             to_date = " ".join(times.split(" ")[3:])
                         else:
                             from_date = ""
                             to_date = ""
 
-                        if is_element_present(role_item, **selectors.DURATION):
-                            duration = (
-                                role_item.find_element(**selectors.DURATION).text.strip()
-                            )
-                        else:
-                            duration = ""
+                        duration = self._try_get_text_from_element(role_item, selectors.DURATION)
 
-                        if is_element_present(role_item, **selectors.LOCATION):
-                            location = (
-                                role_item.find_element(**selectors.LOCATION).text.strip()
-                            )
-                        else:
-                            location = ""
+                        location = self._try_get_text_from_element(role_item, selectors.LOCATION)
 
                         if is_element_present(role_item, **selectors.DESCRIPTION):
                             description = (
@@ -250,43 +237,22 @@ class Person(Scraper):
                         experience.institution_name = company
                         self.add_experience(experience)
                 else:
-                    if is_element_present(position, **selectors.POSITION_WITH_MULTI_ROLES):
-                        position_title = (
-                            position.find_element(**selectors.POSITION).text.strip()
-                        )
-                    else:
-                        position_title = ""
+                    position_title = self._try_get_text_from_element(position, selectors.POSITION_WITH_MULTI_ROLES)
 
-                    if is_element_present(position, **selectors.COMPANY):
-                        company = (
-                            position.find_element(**selectors.COMPANY).text.strip()
-                        )
-                    else:
-                        company = ""
+                    company = self._try_get_text_from_element(position, selectors.COMPANY)
 
-                    if is_element_present(position, **selectors.TIMES):
-                        times = str(
-                            position.find_element(**selectors.TIMES).text.strip()
-                        )
+                    times = self._try_get_text_from_element(position, selectors.TIMES)
+
+                    if times:
                         from_date = " ".join(times.split(" ")[:2])
                         to_date = " ".join(times.split(" ")[3:])
                     else:
                         from_date = ""
                         to_date = ""
 
-                    if is_element_present(position, **selectors.DURATION):
-                        duration = (
-                            position.find_element(**selectors.DURATION).text.strip()
-                        )
-                    else:
-                        duration = ""
+                    duration = self._try_get_text_from_element(position, selectors.DURATION)
 
-                    if is_element_present(position, **selectors.LOCATION):
-                        location = (
-                            position.find_element(**selectors.LOCATION).text.strip()
-                        )
-                    else:
-                        location = ""
+                    location = self._try_get_text_from_element(position, selectors.LOCATION)
 
                     if is_element_present(position, **selectors.DESCRIPTION):
                         description = (
@@ -350,8 +316,16 @@ class Person(Scraper):
                 except:
                     degree = None
                     from_date, to_date = (None, None)
+
+                if is_element_present(school, **selectors.DESCRIPTION):
+                    description = (
+                        self._get_text_excluding_children(
+                            element=school.find_element(**selectors.DESCRIPTION)))
+                else:
+                    description = ""
                 education = Education(
-                    from_date=from_date, to_date=to_date, degree=degree
+                    from_date=from_date, to_date=to_date, degree=degree,
+                    description=description
                 )
                 education.institution_name = university
                 self.add_education(education)
