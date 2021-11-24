@@ -142,7 +142,6 @@ class Person(Scraper):
 
     def scrape_logged_in(self, close_on_complete=True):
         driver = self.driver
-        duration = None
 
         root = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
             EC.presence_of_element_located(
@@ -181,18 +180,19 @@ class Person(Scraper):
             self.add_about(about.text.strip())
 
         # get contacts
-        try:
-            open_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        "//div[contains(@class, 'pv-text-details__left-panel')][2]//a[1]",
-                    )
+        contacts = {}
+        open_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    "//div[contains(@class, 'pv-text-details__left-panel')][2]//a[1]",
                 )
             )
-            driver.execute_script("arguments[0].click();", open_contracts)
+        )
+        driver.execute_script("arguments[0].click();", open_contracts)
 
-            # -> get ims
+        # -> get ims
+        try:
             _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
                 EC.presence_of_element_located(
                     (
@@ -201,17 +201,17 @@ class Person(Scraper):
                     )
                 )
             )
-            ims_spans = driver.find_elements(**selectors.CONTACT_IMS) or []
-            ims_key = []
-            ims_value = []
-            for ims_pos in range(len(ims_spans)):
-                if ims_pos % 2 == 0:
-                    ims_value.append(ims_spans[ims_pos].text.strip())
-                else:
-                    ims_key.append(ims_spans[ims_pos].text.strip().replace("(", "").replace(")", ""))
-            contacts = dict(zip(ims_key, ims_value))
+            ims_lis = driver.find_elements(**selectors.CONTACT_IMS) or []
+            contacts["ims"] = {}
+            for im in ims_lis:
+                im_value = im.find_elements_by_tag_name("span")[0].text.strip()
+                im_key = im.find_elements_by_tag_name("span")[1].text.strip().replace("(", "").replace(")", "")
+                contacts["ims"][im_key] = im_value
+        except:
+            pass
 
-            # -> get email
+        # -> get email
+        try:
             _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
                 EC.presence_of_element_located(
                     (
@@ -223,18 +223,74 @@ class Person(Scraper):
             contact_email = self._try_get_text_from_element(driver, selectors.CONTACT_EMAIL)
             if contact_email:
                 contacts["email"] = contact_email
+        except:
+            pass
 
-            close_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+        # -> get website
+        try:
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
                 EC.presence_of_element_located(
                     (
-                        By.XPATH,
-                        "//*[@data-test-modal-close-btn]",
+                        selectors.CONTACT_WEBSITES['by'],
+                        selectors.CONTACT_WEBSITES['value']
                     )
                 )
             )
-            driver.execute_script("arguments[0].click();", close_contracts)
+            web_lis = driver.find_elements(**selectors.CONTACT_WEBSITES) or []
+            contacts["website"] = {}
+            for website in web_lis:
+                web_value = website.find_element_by_tag_name("a").get_attribute("href")
+                web_key = website.find_element_by_tag_name("span").text.strip().replace("(", "").replace(")", "")
+                contacts["website"][web_key] = web_value
         except:
-            contacts = {}
+            pass
+
+        # -> get twitter
+        try:
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        selectors.CONTACT_TWITTER['by'],
+                        selectors.CONTACT_TWITTER['value']
+                    )
+                )
+            )
+            contact_twitter = self.driver.find_element(**selectors.CONTACT_TWITTER).get_attribute("href")
+            if contact_twitter:
+                if not contacts.__contains__("ims"):
+                    contacts["ims"] = {}
+                contacts["ims"]["twitter"] = contact_twitter
+        except:
+            pass
+
+        # -> get phone
+        try:
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        selectors.CONTACT_PHONE['by'],
+                        selectors.CONTACT_PHONE['value']
+                    )
+                )
+            )
+            phone_lis = driver.find_elements(**selectors.CONTACT_PHONE) or []
+            contacts["phone"] = {}
+            for phone in phone_lis:
+                phone_value = phone.find_elements_by_tag_name("span")[0].text.strip()
+                phone_key = phone.find_elements_by_tag_name("span")[1].text.strip().replace("(", "").replace(")", "")
+                contacts["phone"][phone_key] = phone_value
+        except:
+            pass
+
+        close_contracts = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    "//*[@data-test-modal-close-btn]",
+                )
+            )
+        )
+        driver.execute_script("arguments[0].click();", close_contracts)
         self.add_contacts(contacts)
 
         driver.execute_script(
@@ -300,7 +356,7 @@ class Person(Scraper):
                         experience.institution_name = company
                         self.add_experience(experience)
                 else:
-                    position_title = self._try_get_text_from_element(position, selectors.POSITION_WITH_MULTI_ROLES)
+                    position_title = self._try_get_text_from_element(position, selectors.POSITION)
 
                     company = self._try_get_text_from_element(position, selectors.COMPANY)
 
@@ -397,18 +453,68 @@ class Person(Scraper):
         # get interest
         try:
 
-        # get connections
-        goto_connections = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
                 EC.presence_of_element_located(
                     (
                         By.XPATH,
-                    "//*[contains(@class, 'pv-top-card--list')]//a",
+                        "//*[@class='pv-profile-section pv-interests-section artdeco-container-card artdeco-card ember-view']",
+                    )
                 )
             )
-        )
-        driver.execute_script("arguments[0].click();", goto_connections)
+            interestContainer = driver.find_element(By.XPATH,
+                                                    "//*[@class='pv-profile-section pv-interests-section artdeco-container-card artdeco-card ember-view']"
+                                                    )
+            for interestElement in interestContainer.find_elements_by_xpath(
+                    "//*[@class='pv-interest-entity pv-profile-section__card-item ember-view']"
+            ):
+                interest = Interest(
+                    interestElement.find_element_by_tag_name("h3").text.strip()
+                )
+                self.add_interest(interest)
+        except:
+            pass
 
-        while True:
+        # get accomplishment
+        try:
+            _ = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//*[@class='pv-profile-section pv-accomplishments-section artdeco-container-card artdeco-card ember-view']",
+                    )
+                )
+            )
+            acc = driver.find_element(By.XPATH,
+                                      "//*[@class='pv-profile-section pv-accomplishments-section artdeco-container-card artdeco-card ember-view']"
+                                      )
+            for block in acc.find_elements_by_xpath(
+                    "//div[@class='pv-accomplishments-block__content break-words']"
+            ):
+                category = block.find_element_by_tag_name("h3")
+                for title in block.find_element_by_tag_name(
+                        "ul"
+                ).find_elements_by_tag_name("li"):
+                    accomplishment = Accomplishment(category.text, title.text)
+                    self.add_accomplishment(accomplishment)
+        except:
+            pass
+
+        # get connections
+        has_connections = True
+        try:
+            goto_connections = WebDriverWait(driver, self.__WAIT_FOR_ELEMENT_TIMEOUT).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//*[contains(@class, 'pv-top-card--list')]//a",
+                    )
+                )
+            )
+            driver.execute_script("arguments[0].click();", goto_connections)
+        except:
+            has_connections = False
+
+        while has_connections:
             search_results = WebDriverWait(driver, self.__WAIT_FOR_SEARCH_TIMEOUT).until(
                 EC.presence_of_all_elements_located(
                     (
@@ -429,9 +535,12 @@ class Person(Scraper):
 
             driver.execute_script("var q=document.documentElement.scrollTop=10000")
             driver.implicitly_wait(2)
-            goto_next = driver.find_element(By.XPATH, "//button[contains(@class, 'artdeco-pagination__button--next')]")
-            if goto_next.get_attribute('disabled') != 'true':
-                driver.execute_script("arguments[0].click();", goto_next)
+            if is_element_present(driver, **selectors.CONNECTION_NEXT_PAGE):
+                goto_next = driver.find_element(**selectors.CONNECTION_NEXT_PAGE)
+                if goto_next.get_attribute('disabled') != 'true':
+                    driver.execute_script("arguments[0].click();", goto_next)
+                else:
+                    break
             else:
                 break
 
@@ -455,8 +564,6 @@ class Person(Scraper):
         #             self.add_contact(contact)
         # except:
         #     connections = None
-
-
 
         if close_on_complete:
             driver.quit()

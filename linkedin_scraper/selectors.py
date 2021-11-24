@@ -22,12 +22,12 @@ POSITION_WITH_MULTI_ROLES = {
     'value': ".//h3/span[2]"
 }
 
-COMPANY = {
+POSITION = {
     'by': By.XPATH,
     'value': ".//h3"
 }
 
-POSITION = {
+COMPANY = {
     'by': By.XPATH,
     'value': ".//p[contains(@class, 'pv-entity__secondary-title')]"
 }
@@ -69,7 +69,22 @@ CONTACT_EMAIL = {
 
 CONTACT_IMS = {
     'by': By.XPATH,
-    'value': "//section[contains(@class, 'ci-ims')]//span"
+    'value': "//section[contains(@class, 'ci-ims')]//li"
+}
+
+CONTACT_WEBSITES = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'ci-websites')]//li"
+}
+
+CONTACT_TWITTER = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'ci-twitter')]//a"
+}
+
+CONTACT_PHONE = {
+    'by': By.XPATH,
+    'value': "//section[contains(@class, 'ci-phone')]//li"
 }
 
 CONNECTION_NAME = {
@@ -91,3 +106,9 @@ CONNECTION_LOCATION = {
     'by': By.XPATH,
     'value': ".//div[contains(@class, 'entity-result__secondary-subtitle')]"
 }
+
+CONNECTION_NEXT_PAGE = {
+    'by': By.XPATH,
+    'value': "//button[contains(@class, 'artdeco-pagination__button--next')]"
+}
+
