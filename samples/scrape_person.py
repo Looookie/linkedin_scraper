@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO,
                     stream=log_file,
                     format="%(asctime)s "
                            "%(filename)s [line:%(lineno)d] "
-                           "%(levelname)s\n"
+                           "%(levelname)s "
                            "%(message)s",
                     datefmt="%Y-%M-%d %H:%M:%S"
                     )
@@ -75,15 +75,15 @@ actions.login(driver, email, password)  # if email and password isnt given, it'l
 # scrape_connections("z:\\connections.txt")
 
 user_ids = []
-with open("z:\\connections.txt", 'r', encoding='utf-8') as fconns:
+with open("z:\\tmp\\connections.txt", 'r', encoding='utf-8') as fconns:
     for line in fconns:
         user_ids.append(line.strip('\n'))
 fconns.close()
 
 done = 1
-limit = 50
+limit = 5
 overwrite = False
-base_dir = "z:\\"
+base_dir = "z:\\tmp\\"
 for user_id in user_ids:
     if done <= limit:
         done += scrape_person(user_id=user_id, overwrite=overwrite, base_dir=base_dir)
