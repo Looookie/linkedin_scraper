@@ -14,6 +14,13 @@ def is_element_present(element, by, value) -> bool:
         return False
 
 
+def try_get_text_from_element(root, selector):
+    if is_element_present(root, **selector):
+        return root.find_element(**selector).text.strip()
+    else:
+        return ""
+
+
 class Person(Scraper):
     __TOP_CARD = "pv-top-card"
     __WAIT_FOR_ELEMENT_TIMEOUT = 5
@@ -134,12 +141,6 @@ class Person(Scraper):
         return ret;
         """, element)
 
-    def _try_get_text_from_element(self, root, selector):
-        if is_element_present(root, **selector):
-            return root.find_element(**selector).text.strip()
-        else:
-            return ""
-
     def scrape_logged_in(self, close_on_complete=True):
         driver = self.driver
 
@@ -220,7 +221,7 @@ class Person(Scraper):
                     )
                 )
             )
-            contact_email = self._try_get_text_from_element(driver, selectors.CONTACT_EMAIL)
+            contact_email = try_get_text_from_element(driver, selectors.CONTACT_EMAIL)
             if contact_email:
                 contacts["email"] = contact_email
         except:
@@ -320,12 +321,12 @@ class Person(Scraper):
 
                 if roles_group:
                     # more than one roles in same company
-                    company = self._try_get_text_from_element(position, selectors.COMPANY_WITH_MULTI_ROLES)
+                    company = try_get_text_from_element(position, selectors.COMPANY_WITH_MULTI_ROLES)
 
                     for role_item in roles_group:
-                        position_title = self._try_get_text_from_element(role_item, selectors.POSITION_WITH_MULTI_ROLES)
+                        position_title = try_get_text_from_element(role_item, selectors.POSITION_WITH_MULTI_ROLES)
 
-                        times = self._try_get_text_from_element(role_item, selectors.TIMES)
+                        times = try_get_text_from_element(role_item, selectors.TIMES)
 
                         if times:
                             from_date = " ".join(times.split(" ")[:2])
@@ -334,9 +335,9 @@ class Person(Scraper):
                             from_date = ""
                             to_date = ""
 
-                        duration = self._try_get_text_from_element(role_item, selectors.DURATION)
+                        duration = try_get_text_from_element(role_item, selectors.DURATION)
 
-                        location = self._try_get_text_from_element(role_item, selectors.LOCATION)
+                        location = try_get_text_from_element(role_item, selectors.LOCATION)
 
                         if is_element_present(role_item, **selectors.DESCRIPTION):
                             description = (
@@ -356,11 +357,11 @@ class Person(Scraper):
                         experience.institution_name = company
                         self.add_experience(experience)
                 else:
-                    position_title = self._try_get_text_from_element(position, selectors.POSITION)
+                    position_title = try_get_text_from_element(position, selectors.POSITION)
 
-                    company = self._try_get_text_from_element(position, selectors.COMPANY)
+                    company = try_get_text_from_element(position, selectors.COMPANY)
 
-                    times = self._try_get_text_from_element(position, selectors.TIMES)
+                    times = try_get_text_from_element(position, selectors.TIMES)
 
                     if times:
                         from_date = " ".join(times.split(" ")[:2])
@@ -369,9 +370,9 @@ class Person(Scraper):
                         from_date = ""
                         to_date = ""
 
-                    duration = self._try_get_text_from_element(position, selectors.DURATION)
+                    duration = try_get_text_from_element(position, selectors.DURATION)
 
-                    location = self._try_get_text_from_element(position, selectors.LOCATION)
+                    location = try_get_text_from_element(position, selectors.LOCATION)
 
                     if is_element_present(position, **selectors.DESCRIPTION):
                         description = (
@@ -515,21 +516,24 @@ class Person(Scraper):
             has_connections = False
 
         while has_connections:
-            search_results = WebDriverWait(driver, self.__WAIT_FOR_SEARCH_TIMEOUT).until(
-                EC.presence_of_all_elements_located(
-                    (
-                        By.XPATH,
-                        "//div[contains(@class, 'entity-result__content')]",
+            try:
+                search_results = WebDriverWait(driver, self.__WAIT_FOR_SEARCH_TIMEOUT).until(
+                    EC.presence_of_all_elements_located(
+                        (
+                            By.XPATH,
+                            "//div[contains(@class, 'entity-result__content')]",
+                        )
                     )
                 )
-            )
+            except:
+                search_results = []
 
             for result_item in search_results:
-                connection_name = self._try_get_text_from_element(result_item, selectors.CONNECTION_NAME)
-                connection_occupation = self._try_get_text_from_element(result_item, selectors.CONNECTION_OCCUPATION)
+                connection_name = try_get_text_from_element(result_item, selectors.CONNECTION_NAME)
+                connection_occupation = try_get_text_from_element(result_item, selectors.CONNECTION_OCCUPATION)
                 url = result_item.find_element(**selectors.CONNECTION_URL).get_attribute('href')
                 connection_url = url[:url.rfind('?')]
-                connection_location = self._try_get_text_from_element(result_item, selectors.CONNECTION_LOCATION)
+                connection_location = try_get_text_from_element(result_item, selectors.CONNECTION_LOCATION)
                 self.add_connection(Contact(name=connection_name, occupation=connection_occupation, url=connection_url,
                                             location=connection_location))
 
