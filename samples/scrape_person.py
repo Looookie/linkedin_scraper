@@ -15,14 +15,18 @@ from threading import Thread
 
 from samples.atomic_counter import AtomicCounter
 
-log_file = open("z:\\scrape.log", encoding="utf-8", mode="a")
+WORK_DIR = "Z:\\"
+DATA_DIR = f"{WORK_DIR}\\linkedin\\"
+TASK_LIMIT = 328
+
+log_file = open(f"{WORK_DIR}scrape.log", encoding="utf-8", mode="a")
 logging.basicConfig(level=logging.INFO,
                     stream=log_file,
                     format="%(asctime)s "
                            "%(filename)s [line:%(lineno)d] "
                            "%(levelname)s "
                            "%(message)s",
-                    datefmt="%Y-%M-%d %H:%M:%S"
+                    datefmt="%Y-%m-%d %H:%M:%S"
                     )
 
 
@@ -44,8 +48,8 @@ class WorkerConfig:
 
 LINKEDIN_URL_PREFIX = "https://www.linkedin.com/in/"
 STOP_FLAG = "==STOP=="
-config = WorkerConfig(base_dir="Z:\\tmp\\", limit=50)
-concurrency = 4
+config = WorkerConfig(base_dir=DATA_DIR, limit=TASK_LIMIT)
+concurrency = 3
 
 
 # save cookies
@@ -58,7 +62,7 @@ def save_cookies(path):
 
     # do login steps, so cookies can be set
     pickle.dump(driver.get_cookies(), open(path, "wb"))
-    driver.quit()
+    # driver.quit()
 
 
 # load cookies
@@ -92,43 +96,18 @@ def scrape_connections(driver, file_path):
                 anchor = conn.find_element_by_class_name("mn-connection-card__link")
                 user_id = anchor.get_attribute("href")[len(LINKEDIN_URL_PREFIX):-1]
                 user_ids.add(user_id)
-    fconns = open(file_path, 'w', encoding='utf-8')
-    for user_id in user_ids:
-        fconns.write(user_id + "\n")
-    fconns.close()
+    with open(file_path, 'w', encoding='utf-8') as fconns:
+        for user_id in user_ids:
+            fconns.write(user_id + "\n")
 
 
-# scrape_connections("z:\\connections.txt")
-
-# Prepare data
-selenium_data = []
-with open("z:\\tmp\\connections.txt", 'r', encoding='utf-8') as fconns:
-    for (num, line) in enumerate(fconns):
-        selenium_data.append(line.strip('\n'))
-selenium_data.append(STOP_FLAG)
-
-worker_ids = list(range(concurrency))
-selenium_data_queue = Queue()
-worker_queue = Queue()
-selenium_workers = {}
-
-# Prepare workers
-options = webdriver.ChromeOptions()
-options.add_argument("--start-maximized")
-options.add_experimental_option("excludeSwitches", ["enable-automation"])
-options.add_experimental_option("detach", True)
-options.add_experimental_option('prefs', {'credentials_enable_service': False,
-                                          'profile': {'password_manager_enabled': False}})
-for worker_id in worker_ids:
-    selenium_workers[worker_id] = webdriver.Chrome(options=options, executable_path="./chromedriver")
-    worker_queue.put(worker_id)
-
-cookie_path = "z:\\cookie.pkl"
-
-# transfer cookies
-save_cookies(cookie_path)
-for wid in worker_ids:
-    load_cookies(selenium_workers[wid], cookie_path)
+def prepare_connections():
+    datas = []
+    with open(f"{DATA_DIR}connections.txt", 'r', encoding='utf-8') as fconns:
+        for (num, line) in enumerate(fconns):
+            datas.append(line.strip('\n'))
+    datas.append(STOP_FLAG)
+    return datas
 
 
 def selenium_task(worker, user_id, worker_id, worker_config):
@@ -197,6 +176,34 @@ def selenium_queue_listener(data_queue, worker_id_queue, listener_id, task_count
             logging.info(f"listner-{listener_id} has completed task, total {task_counter.value} done.")
     return
 
+
+# scrape_connections("z:\\connections.txt")
+
+# Prepare data
+selenium_data = prepare_connections()
+
+worker_ids = list(range(concurrency))
+selenium_data_queue = Queue()
+worker_queue = Queue()
+selenium_workers = {}
+
+# Prepare workers
+options = webdriver.ChromeOptions()
+options.add_argument("--start-maximized")
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.add_experimental_option("detach", True)
+options.add_experimental_option('prefs', {'credentials_enable_service': False,
+                                          'profile': {'password_manager_enabled': False}})
+for wid in worker_ids:
+    selenium_workers[wid] = webdriver.Chrome(options=options, executable_path="./chromedriver")
+    worker_queue.put(wid)
+
+cookie_path = "z:\\cookie.pkl"
+
+# transfer cookies
+# save_cookies(cookie_path)
+for wid in worker_ids:
+    load_cookies(selenium_workers[wid], cookie_path)
 
 counter = AtomicCounter()
 # Create one new queue listener thread per selenium worker and start them
