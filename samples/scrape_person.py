@@ -14,10 +14,15 @@ from multiprocessing import Queue
 from threading import Thread
 
 from samples.atomic_counter import AtomicCounter
+from samples.scrape_config import WorkerConfig
 
 WORK_DIR = "Z:\\"
-DATA_DIR = f"{WORK_DIR}\\linkedin\\"
-TASK_LIMIT = 328
+DATA_DIR = f"{WORK_DIR}linkedin\\"
+TASK_LIMIT = 300
+LINKEDIN_URL_PREFIX = "https://www.linkedin.com/in/"
+STOP_FLAG = "==STOP=="
+config = WorkerConfig(base_dir=DATA_DIR, limit=TASK_LIMIT)
+concurrency = 3
 
 log_file = open(f"{WORK_DIR}scrape.log", encoding="utf-8", mode="a")
 logging.basicConfig(level=logging.INFO,
@@ -30,36 +35,18 @@ logging.basicConfig(level=logging.INFO,
                     )
 
 
-class WorkerConfig:
-    limit: int = 1
-    overwrite: bool = False
-    base_dir: str = None
-
-    def __init__(
-            self,
-            limit=1,
-            overwrite=False,
-            base_dir=""
-    ):
-        self.limit = limit
-        self.overwrite = overwrite
-        self.base_dir = base_dir
-
-
-LINKEDIN_URL_PREFIX = "https://www.linkedin.com/in/"
-STOP_FLAG = "==STOP=="
-config = WorkerConfig(base_dir=DATA_DIR, limit=TASK_LIMIT)
-concurrency = 3
+def login(driver_options):
+    email = os.getenv("LINKEDIN_USER")
+    password = os.getenv("LINKEDIN_PASSWORD")
+    driver = webdriver.Chrome(options=driver_options, executable_path="./chromedriver")
+    actions.login(driver, email, password)  # if email and password isn't given, it'll prompt in terminal
+    return driver
 
 
 # save cookies
-def save_cookies(path):
+def save_cookies(path, driver_options):
     # login
-    email = os.getenv("LINKEDIN_USER")
-    password = os.getenv("LINKEDIN_PASSWORD")
-    driver = webdriver.Chrome(options=options, executable_path="./chromedriver")
-    actions.login(driver, email, password)  # if email and password isnt given, it'll prompt in terminal
-
+    driver = login(driver_options)
     # do login steps, so cookies can be set
     pickle.dump(driver.get_cookies(), open(path, "wb"))
     # driver.quit()
@@ -73,8 +60,9 @@ def load_cookies(driver, path):
         driver.add_cookie(cookie)
 
 
-def scrape_connections(driver, file_path):
+def scrape_connections():
     user_ids = set()
+    driver = login(driver_options=browser_options())
     driver.get("https://www.linkedin.com/mynetwork/invite-connect/connections/")
     _ = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CLASS_NAME, "mn-connections"))
@@ -96,9 +84,10 @@ def scrape_connections(driver, file_path):
                 anchor = conn.find_element_by_class_name("mn-connection-card__link")
                 user_id = anchor.get_attribute("href")[len(LINKEDIN_URL_PREFIX):-1]
                 user_ids.add(user_id)
-    with open(file_path, 'w', encoding='utf-8') as fconns:
+    with open(f"{DATA_DIR}connections.txt", 'w', encoding='utf-8') as fconns:
         for user_id in user_ids:
             fconns.write(user_id + "\n")
+    driver.quit()
 
 
 def prepare_connections():
@@ -140,13 +129,14 @@ def selenium_task(worker, user_id, worker_id, worker_config):
             return 0
 
 
-def selenium_queue_listener(data_queue, worker_id_queue, listener_id, task_counter, worker_config):
+def selenium_queue_listener(data_queue, worker_id_queue, selenium_workers, listener_id, task_counter, worker_config):
     """
     Monitor a data queue and assign new pieces of data to any available web workers to action
     :param data_queue: The python FIFO queue containing the data to run on the web worker
     :type data_queue: Queue
     :param worker_id_queue: The queue that holds the IDs of any idle workers
     :type worker_id_queue: Queue
+    :param selenium_workers:
     :param listener_id:
     :param worker_config: WorkerConfig
     :param task_counter: AtomicCounter
@@ -170,64 +160,70 @@ def selenium_queue_listener(data_queue, worker_id_queue, listener_id, task_count
         # Assign current worker and current data to your selenium function
         done = selenium_task(worker, current_data, worker_id, worker_config)
         # Put the worker back into the worker queue as  it has completed it's task
-        worker_queue.put(worker_id)
+        worker_id_queue.put(worker_id)
         if done > 0:
             task_counter.inc()
             logging.info(f"listner-{listener_id} has completed task, total {task_counter.value} done.")
     return
 
 
-# scrape_connections("z:\\connections.txt")
+def multi_scrape():
+    # Prepare data
+    selenium_data = prepare_connections()
 
-# Prepare data
-selenium_data = prepare_connections()
+    worker_ids = list(range(concurrency))
+    selenium_data_queue = Queue()
+    worker_queue = Queue()
+    selenium_workers = {}
 
-worker_ids = list(range(concurrency))
-selenium_data_queue = Queue()
-worker_queue = Queue()
-selenium_workers = {}
+    # Prepare workers
+    options = browser_options()
+    for wid in worker_ids:
+        selenium_workers[wid] = webdriver.Chrome(options=options, executable_path="./chromedriver")
+        worker_queue.put(wid)
 
-# Prepare workers
-options = webdriver.ChromeOptions()
-options.add_argument("--start-maximized")
-options.add_experimental_option("excludeSwitches", ["enable-automation"])
-options.add_experimental_option("detach", True)
-options.add_experimental_option('prefs', {'credentials_enable_service': False,
-                                          'profile': {'password_manager_enabled': False}})
-for wid in worker_ids:
-    selenium_workers[wid] = webdriver.Chrome(options=options, executable_path="./chromedriver")
-    worker_queue.put(wid)
+    cookie_path = f"{WORK_DIR}cookie.pkl"
 
-cookie_path = "z:\\cookie.pkl"
+    # transfer cookies
+    save_cookies(cookie_path, options)
+    for wid in worker_ids:
+        load_cookies(selenium_workers[wid], cookie_path)
 
-# transfer cookies
-# save_cookies(cookie_path)
-for wid in worker_ids:
-    load_cookies(selenium_workers[wid], cookie_path)
+    counter = AtomicCounter()
+    # Create one new queue listener thread per selenium worker and start them
+    logging.info("Starting selenium background processes")
+    selenium_processes = [Thread(target=selenium_queue_listener,
+                                 args=(selenium_data_queue, worker_queue, selenium_workers, wid, counter, config))
+                          for wid in worker_ids]
+    for p in selenium_processes:
+        p.daemon = True
+        p.start()
 
-counter = AtomicCounter()
-# Create one new queue listener thread per selenium worker and start them
-logging.info("Starting selenium background processes")
-selenium_processes = [Thread(target=selenium_queue_listener,
-                             args=(selenium_data_queue, worker_queue, wid, counter, config)) for wid in worker_ids]
-for p in selenium_processes:
-    p.daemon = True
-    p.start()
+    # Add each item of data to the data queue, this could be done over time so long as the selenium queue listening
+    # processes are still running
+    logging.info("Adding data to data queue")
+    for d in selenium_data:
+        selenium_data_queue.put(d)
 
-# Add each item of data to the data queue, this could be done over time so long as the selenium queue listening
-# processes are still running
-logging.info("Adding data to data queue")
-for d in selenium_data:
-    selenium_data_queue.put(d)
+    # Wait for all selenium queue listening processes to complete, this happens when the queue listener returns
+    logging.info("Waiting for Queue listener threads to complete")
+    for p in selenium_processes:
+        p.join()
 
-# Wait for all selenium queue listening processes to complete, this happens when the queue listener returns
-logging.info("Waiting for Queue listener threads to complete")
-for p in selenium_processes:
-    p.join()
+    # Quit all the web workers elegantly in the background
+    logging.info("Tearing down web workers")
+    for b in selenium_workers.values():
+        b.quit()
 
-# Quit all the web workers elegantly in the background
-logging.info("Tearing down web workers")
-for b in selenium_workers.values():
-    b.quit()
 
-exit()
+def browser_options():
+    options = webdriver.ChromeOptions()
+    options.add_argument("--start-maximized")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("detach", True)
+    options.add_experimental_option('prefs', {'credentials_enable_service': False,
+                                              'profile': {'password_manager_enabled': False}})
+    return options
+
+
+multi_scrape()
